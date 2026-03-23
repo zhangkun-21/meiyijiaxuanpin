@@ -53,7 +53,14 @@ function classifyProducts(rows: SkuRow[]) {
   return { delist, list }
 }
 
-const COL_HEADERS = ['商品代码', '商品名称', '90天平均销售额', '当前毛利率', 'AI建议下架原因', '是否采纳']
+const COL_HEADERS: React.ReactNode[] = [
+  '商品代码',
+  '商品名称',
+  <>90天<br />平均销售额</>,
+  <>当前<br />毛利率</>,
+  <>AI建议<br />下架原因</>,
+  <>是否<br />采纳</>,
+]
 
 export default function ProductPage() {
   const [searchParams] = useSearchParams()
@@ -103,6 +110,9 @@ export default function ProductPage() {
       {/* Fixed header: title + scenario tabs + table column headers */}
       <div style={s.fixedHeader}>
         <div style={s.topBar}>
+          <button style={s.backBtn} onClick={() => navigate(`/shelf?store=${encodeURIComponent(storeId)}`)}>
+            &#8592; 返回货架
+          </button>
           <span style={s.titlePill}>选品建议</span>
         </div>
 
@@ -258,7 +268,21 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #e0e0e0',
   },
   topBar: {
-    padding: '14px 24px 10px',
+    padding: '12px 24px 10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backBtn: {
+    background: 'none',
+    border: '1px solid #ccc',
+    borderRadius: 20,
+    padding: '5px 14px',
+    fontSize: 13,
+    color: '#555',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as React.CSSProperties['whiteSpace'],
+    flexShrink: 0,
   },
   titlePill: {
     border: '1.5px solid #333',
@@ -339,13 +363,12 @@ const s: Record<string, React.CSSProperties> = {
     background: '#f0f0f0',
     borderRight: '1px solid #d0d0d0',
     borderBottom: '1px solid #d0d0d0',
-    padding: '8px 6px',
+    padding: '7px 4px',
     textAlign: 'center',
     fontWeight: 500,
     color: '#444',
-    whiteSpace: 'normal' as React.CSSProperties['whiteSpace'],
-    wordBreak: 'keep-all' as React.CSSProperties['wordBreak'],
     lineHeight: 1.4,
+    verticalAlign: 'middle',
   },
   td: {
     borderRight: '1px solid #e8e8e8',
