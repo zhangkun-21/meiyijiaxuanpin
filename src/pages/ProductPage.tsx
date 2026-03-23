@@ -121,33 +121,38 @@ export default function ProductPage() {
           </div>
         </div>
 
-        {/* Column headers row (sticky) */}
-        <div style={s.colHeadersRow}>
-          <div style={s.tableHeaderBox}>
-            <div style={s.tableTitle}>建议下架清单</div>
-            <table style={s.table}>
-              <thead>
-                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
-              </thead>
-            </table>
-          </div>
-          <div style={s.tableHeaderBox}>
-            <div style={s.tableTitle}>建议上架清单</div>
-            <table style={s.table}>
-              <thead>
-                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
-              </thead>
-            </table>
-          </div>
-        </div>
       </div>
 
-      {/* Scrollable product rows */}
-      <div style={s.scrollArea}>
-        <div style={s.tablesRow}>
-          {/* 建议下架 */}
-          <div style={s.tableBox}>
+      {/* Two independently scrollable panels */}
+      <div style={s.panelsRow}>
+        {/* 建议下架 */}
+        <div style={s.panel}>
+          <div style={s.panelHeader}>
+            <div style={s.tableTitle}>建议下架清单</div>
             <table style={s.table}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
+              <thead>
+                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+              </thead>
+            </table>
+          </div>
+          <div style={s.panelScroll}>
+            <table style={s.table}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
               <tbody>
                 {delist.length === 0 ? (
                   <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
@@ -171,10 +176,36 @@ export default function ProductPage() {
               </tbody>
             </table>
           </div>
+        </div>
 
-          {/* 建议上架 */}
-          <div style={s.tableBox}>
+        {/* 建议上架 */}
+        <div style={s.panel}>
+          <div style={s.panelHeader}>
+            <div style={s.tableTitle}>建议上架清单</div>
             <table style={s.table}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
+              <thead>
+                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+              </thead>
+            </table>
+          </div>
+          <div style={s.panelScroll}>
+            <table style={s.table}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
               <tbody>
                 {list.length === 0 ? (
                   <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
@@ -264,35 +295,31 @@ const s: Record<string, React.CSSProperties> = {
     borderColor: '#f5b7b1',
     fontWeight: 600,
   },
-  colHeadersRow: {
+  panelsRow: {
+    flex: 1,
     display: 'flex',
     gap: 12,
     padding: '0 24px',
-  },
-  tableHeaderBox: {
-    flex: 1,
-    minWidth: 0,
-    border: '1px solid #d0d0d0',
-    borderRadius: '4px 4px 0 0',
     overflow: 'hidden',
   },
-  scrollArea: {
+  panel: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    border: '1px solid #d0d0d0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  panelHeader: {
+    flexShrink: 0,
+    background: '#fff',
+    borderBottom: '1px solid #d0d0d0',
+  },
+  panelScroll: {
     flex: 1,
     overflowY: 'auto',
-    padding: '0 24px',
     WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
-  },
-  tablesRow: {
-    display: 'flex',
-    gap: 12,
-  },
-  tableBox: {
-    flex: 1,
-    minWidth: 0,
-    border: '1px solid #d0d0d0',
-    borderTop: 'none',
-    borderRadius: '0 0 4px 4px',
-    overflow: 'hidden',
   },
   tableTitle: {
     background: '#f7f7f7',
@@ -306,17 +333,19 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: 12,
-    tableLayout: 'fixed',
+    tableLayout: 'fixed' as React.CSSProperties['tableLayout'],
   },
   th: {
     background: '#f0f0f0',
     borderRight: '1px solid #d0d0d0',
     borderBottom: '1px solid #d0d0d0',
-    padding: '7px 5px',
+    padding: '8px 6px',
     textAlign: 'center',
     fontWeight: 500,
     color: '#444',
-    whiteSpace: 'nowrap' as React.CSSProperties['whiteSpace'],
+    whiteSpace: 'normal' as React.CSSProperties['whiteSpace'],
+    wordBreak: 'keep-all' as React.CSSProperties['wordBreak'],
+    lineHeight: 1.4,
   },
   td: {
     borderRight: '1px solid #e8e8e8',
