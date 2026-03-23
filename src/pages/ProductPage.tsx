@@ -35,20 +35,71 @@ function filterByScenario(data: SkuRow[], scenario: string): SkuRow[] {
   )
 }
 
-// Decide whether a product should be listed as "建议下架" or "建议上架"
-// 建议下架: 是否总仓淘汰 = 是/1, or 销售分级 = BC
-// 建议上架: everything else in the scenario
+// Parse a percentage string like "12.5%" or "0.125" to a number 0-100
+function parsePct(val: string | undefined): number {
+  if (!val) return 0
+  const n = parseFloat(val)
+  if (isNaN(n)) return 0
+  // If stored as decimal (e.g. 0.12 meaning 12%), convert
+  return Math.abs(n) < 1.5 ? n * 100 : n
+}
+
+// Generate a human-readable delist reason based on data
+function delistReasonText(r: SkuRow): string {
+  const discontinued = r.是否总仓淘汰 === '是' || r.是否总仓淘汰 === '1'
+  if (discontinued) return '总仓已淘汰'
+  const sales = parseFloat(r['90天平均销售额']) || 0
+  const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
+  const margin = parsePct(r.当前毛利率)
+  const isLowSales = avg > 0 && sales < avg * 0.5
+  const isLowMargin = margin < 15 && margin > 0
+  if (isLowSales && isLowMargin) return '动销不足且毛利偏低'
+  if (isLowSales) return '动销不足，低于品类均值50%'
+  if (isLowMargin) return '毛利率低于15%'
+  if (r.销售分级 === 'BC') return '销售分级BC，贡献度低'
+  return '综合表现偏弱'
+}
+
+// Generate a human-readable list reason
+function listReasonText(r: SkuRow): string {
+  const margin = parsePct(r.当前毛利率)
+  const sales = parseFloat(r['90天平均销售额']) || 0
+  const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
+  const highSales = r['是否高销/低销标签（门店）']?.includes('高') 
+  const highGrade = r.销售分级 === 'A'
+  if (highGrade && margin >= 20) return '销售分级A，毛利优秀'
+  if (highSales) return '门店高销标签，动销强劲'
+  if (margin >= 25) return `毛利率${margin.toFixed(0)}%，利润贡献高`
+  if (avg > 0 && sales > avg) return '销售额高于品类均值'
+  return '动销与毛利综合表现良好'
+}
+
+// Classify products by actual sales velocity and margin data
+// 建议下架: 总仓淘汰 OR (动销低于品类均值50% AND 毛利<15%) OR 销售分级BC
+// 建议上架: 销售分级A OR (动销高于均值 AND 毛利>=20%) OR 门店高销标签
+// 其他: 不进入任何清单
 function classifyProducts(rows: SkuRow[]) {
   const delist: SkuRow[] = []
   const list: SkuRow[] = []
   for (const r of rows) {
     const discontinued = r.是否总仓淘汰 === '是' || r.是否总仓淘汰 === '1'
-    const lowGrade = r.销售分级 === 'BC'
-    if (discontinued || lowGrade) {
+    const sales = parseFloat(r['90天平均销售额']) || 0
+    const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
+    const margin = parsePct(r.当前毛利率)
+    const isLowSales = avg > 0 && sales < avg * 0.5
+    const isLowMargin = margin > 0 && margin < 15
+    const isLowGrade = r.销售分级 === 'BC'
+    const isHighGrade = r.销售分级 === 'A'
+    const isHighSales = r['是否高销/低销标签（门店）']?.includes('高')
+    const isAboveAvg = avg > 0 && sales > avg
+    const isGoodMargin = margin >= 20
+
+    if (discontinued || (isLowSales && isLowMargin) || isLowGrade) {
       delist.push(r)
-    } else {
+    } else if (isHighGrade || (isHighSales && isGoodMargin) || (isAboveAvg && isGoodMargin)) {
       list.push(r)
     }
+    // products that don't meet either threshold are excluded from both lists
   }
   return { delist, list }
 }
@@ -180,8 +231,8 @@ export default function ProductPage() {
                     <td style={s.td}>{r.商品代码}</td>
                     <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
                     <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
-                    <td style={s.td}>{grossRate(r)}</td>
-                    <td style={s.td}>{delistReason(r)}</td>
+                    <td style={s.td}>{parsePct(r.当前毛利率).toFixed(1)}%</td>
+                    <td style={{ ...s.td, textAlign: 'left', fontSize: 11 }}>{delistReasonText(r)}</td>
                     <td style={s.td}>
                       <button
                         style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
@@ -233,8 +284,8 @@ export default function ProductPage() {
                     <td style={s.td}>{r.商品代码}</td>
                     <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
                     <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
-                    <td style={s.td}>{grossRate(r)}</td>
-                    <td style={s.td}>—</td>
+                    <td style={s.td}>{parsePct(r.当前毛利率).toFixed(1)}%</td>
+                    <td style={{ ...s.td, textAlign: 'left', fontSize: 11 }}>{listReasonText(r)}</td>
                     <td style={s.td}>
                       <button
                         style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
