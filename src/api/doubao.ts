@@ -1,4 +1,4 @@
-import type { AIDiagnosisResult } from '../types'
+import type { AIDiagnosisResult, ProductSelection } from '../types'
 
 const API_KEY = import.meta.env.VITE_DOUBAO_API_KEY as string
 const ENDPOINT_RAW = import.meta.env.VITE_DOUBAO_ENDPOINT as string
@@ -88,4 +88,107 @@ ${scenarioText}
     result[item.scene] = { suggestedGroups: item.suggestedGroups, reason: item.reason }
   }
   return result
+}
+
+// ------- Performance Prediction -------
+
+export interface PerformancePrediction {
+  salesRateIncrease: string    // e.g. "5%"
+  grossMarginIncrease: string  // e.g. "3%"
+  inventoryReduction: string   // e.g. "80个"
+  summary: string              // AI-generated summary
+}
+
+export async function predictPerformance(
+  storeId: string,
+  selections: ProductSelection[]
+): Promise<PerformancePrediction> {
+  // Separate adopted delist vs adopted list items
+  const delistAdopted = selections.filter(s => {
+    const discontinued = s.sku.是否总仓淘汰 === '是' || s.sku.是否总仓淘汰 === '1'
+    const lowGrade = s.sku.销售分级 === 'BC'
+    return (discontinued || lowGrade) && s.adopted
+  })
+  const listAdopted = selections.filter(s => {
+    const discontinued = s.sku.是否总仓淘汰 === '是' || s.sku.是否总仓淘汰 === '1'
+    const lowGrade = s.sku.销售分级 === 'BC'
+    return !(discontinued || lowGrade) && s.adopted
+  })
+
+  const delistSales = delistAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
+  const listSales = listAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
+  const delistCount = delistAdopted.length
+  const listCount = listAdopted.length
+
+  if (!API_KEY || API_KEY === 'YOUR_API_KEY' || !MODEL || MODEL === 'YOUR_MODEL_ID') {
+    // Mock prediction
+    const salesRate = (2 + Math.random() * 6).toFixed(1)
+    const margin = (1 + Math.random() * 4).toFixed(1)
+    const inv = Math.round(30 + Math.random() * 120)
+    return {
+      salesRateIncrease: `${salesRate}%`,
+      grossMarginIncrease: `${margin}%`,
+      inventoryReduction: `${inv}个`,
+      summary: `通过下架${delistCount}个低效SKU、保留${listCount}个优质商品，预计门店坪效和动销率将显著提升。`,
+    }
+  }
+
+  const prompt = `你是一名便利店选品分析专家。门店${storeId}完成了以下选品调整：
+
+- 采纳下架建议的商品数量：${delistCount}个，涉及90天销售额约${delistSales.toFixed(0)}元
+- 保留上架的商品数量：${listCount}个，涉及90天销售额约${listSales.toFixed(0)}元
+
+请根据以上数据，预测选品调整后的业绩提升效果。要求：
+1. 动销率提升百分比（如5%）
+2. 毛利率提升百分比（如3%）
+3. 积压库存减少数量（如80个）
+4. 简短总结（50字以内）
+
+以JSON格式返回：
+{"salesRateIncrease": "X%", "grossMarginIncrease": "X%", "inventoryReduction": "X个", "summary": "..."}
+
+只返回JSON，不要其他内容。`
+
+  const response = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: (!MODEL || MODEL === 'YOUR_MODEL_ID') ? ENDPOINT_RAW : MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      thinking: { type: "disabled" },
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`API请求失败: ${response.status}`)
+  }
+
+  const json = await response.json()
+  const content: string = json.choices?.[0]?.message?.content ?? '{}'
+
+  try {
+    const match = content.match(/\{[\s\S]*\}/)
+    if (match) {
+      const parsed = JSON.parse(match[0]) as PerformancePrediction
+      return {
+        salesRateIncrease: parsed.salesRateIncrease ?? '5%',
+        grossMarginIncrease: parsed.grossMarginIncrease ?? '3%',
+        inventoryReduction: parsed.inventoryReduction ?? '50个',
+        summary: parsed.summary ?? '选品优化后预计业绩将显著提升。',
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  return {
+    salesRateIncrease: '5%',
+    grossMarginIncrease: '3%',
+    inventoryReduction: '50个',
+    summary: '选品优化后预计业绩将显著提升。',
+  }
 }
