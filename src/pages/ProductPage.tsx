@@ -53,12 +53,21 @@ function classifyProducts(rows: SkuRow[]) {
   return { delist, list }
 }
 
-const COL_HEADERS: React.ReactNode[] = [
+const DELIST_HEADERS: React.ReactNode[] = [
   '商品代码',
   '商品名称',
   <>90天<br />平均销售额</>,
   <>当前<br />毛利率</>,
   <>AI建议<br />下架原因</>,
+  <>是否<br />采纳</>,
+]
+
+const LIST_HEADERS: React.ReactNode[] = [
+  '商品代码',
+  '商品名称',
+  <>90天<br />平均销售额</>,
+  <>当前<br />毛利率</>,
+  <>上架<br />优势</>,
   <>是否<br />采纳</>,
 ]
 
@@ -149,7 +158,7 @@ export default function ProductPage() {
                 <col style={{ width: '14%' }} />
               </colgroup>
               <thead>
-                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                <tr>{DELIST_HEADERS.map(h => <th key={String(h)} style={s.th}>{h}</th>)}</tr>
               </thead>
             </table>
           </div>
@@ -202,7 +211,7 @@ export default function ProductPage() {
                 <col style={{ width: '14%' }} />
               </colgroup>
               <thead>
-                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                <tr>{LIST_HEADERS.map(h => <th key={String(h)} style={s.th}>{h}</th>)}</tr>
               </thead>
             </table>
           </div>
