@@ -100,130 +100,148 @@ export default function ProductPage() {
 
   return (
     <div style={s.page}>
-      {/* Title */}
-      <div style={s.topBar}>
-        <span style={s.titlePill}>选品建议</span>
-      </div>
+      {/* Fixed header: title + scenario tabs + table column headers */}
+      <div style={s.fixedHeader}>
+        <div style={s.topBar}>
+          <span style={s.titlePill}>选品建议</span>
+        </div>
 
-      {/* Scrollable scenario tabs */}
-      <div style={s.tabsOuter}>
-        <div style={s.tabsInner}>
-          {SCENARIO_NAMES.map(name => (
-            <button
-              key={name}
-              style={{ ...s.tab, ...(activeScenario === name ? s.tabActive : {}) }}
-              onClick={() => setActiveScenario(name)}
-            >
-              {name}
-            </button>
-          ))}
+        {/* Horizontal scrollable scenario tabs */}
+        <div style={s.tabsOuter}>
+          <div style={s.tabsInner}>
+            {SCENARIO_NAMES.map(name => (
+              <button
+                key={name}
+                style={{ ...s.tab, ...(activeScenario === name ? s.tabActive : {}) }}
+                onClick={() => setActiveScenario(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Column headers row (sticky) */}
+        <div style={s.colHeadersRow}>
+          <div style={s.tableHeaderBox}>
+            <div style={s.tableTitle}>建议下架清单</div>
+            <table style={s.table}>
+              <thead>
+                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+              </thead>
+            </table>
+          </div>
+          <div style={s.tableHeaderBox}>
+            <div style={s.tableTitle}>建议上架清单</div>
+            <table style={s.table}>
+              <thead>
+                <tr>{COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+              </thead>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Two tables side by side */}
-      <div style={s.tablesRow}>
-        {/* 建议下架 */}
-        <div style={s.tableBox}>
-          <div style={s.tableTitle}>建议下架清单</div>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                {COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {delist.length === 0 ? (
-                <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
-              ) : delist.map(r => (
-                <tr key={r.商品代码 || r.商品名称}>
-                  <td style={s.td}>{r.商品代码}</td>
-                  <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
-                  <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
-                  <td style={s.td}>{grossRate(r)}</td>
-                  <td style={s.td}>{delistReason(r)}</td>
-                  <td style={s.td}>
-                    <button
-                      style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
-                      onClick={() => toggleAdopt(r.商品代码)}
-                    >
-                      {isAdopted(r.商品代码) ? '是' : '否'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Scrollable product rows */}
+      <div style={s.scrollArea}>
+        <div style={s.tablesRow}>
+          {/* 建议下架 */}
+          <div style={s.tableBox}>
+            <table style={s.table}>
+              <tbody>
+                {delist.length === 0 ? (
+                  <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
+                ) : delist.map(r => (
+                  <tr key={r.商品代码 || r.商品名称}>
+                    <td style={s.td}>{r.商品代码}</td>
+                    <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
+                    <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
+                    <td style={s.td}>{grossRate(r)}</td>
+                    <td style={s.td}>{delistReason(r)}</td>
+                    <td style={s.td}>
+                      <button
+                        style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
+                        onClick={() => toggleAdopt(r.商品代码)}
+                      >
+                        {isAdopted(r.商品代码) ? '是' : '否'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* 建议上架 */}
-        <div style={s.tableBox}>
-          <div style={s.tableTitle}>建议上架清单</div>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                {COL_HEADERS.map(h => <th key={h} style={s.th}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
-              ) : list.map(r => (
-                <tr key={r.商品代码 || r.商品名称}>
-                  <td style={s.td}>{r.商品代码}</td>
-                  <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
-                  <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
-                  <td style={s.td}>{grossRate(r)}</td>
-                  <td style={s.td}>—</td>
-                  <td style={s.td}>
-                    <button
-                      style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
-                      onClick={() => toggleAdopt(r.商品代码)}
-                    >
-                      {isAdopted(r.商品代码) ? '是' : '否'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* 建议上架 */}
+          <div style={s.tableBox}>
+            <table style={s.table}>
+              <tbody>
+                {list.length === 0 ? (
+                  <tr><td colSpan={6} style={{ ...s.td, color: '#aaa', textAlign: 'center' }}>暂无</td></tr>
+                ) : list.map(r => (
+                  <tr key={r.商品代码 || r.商品名称}>
+                    <td style={s.td}>{r.商品代码}</td>
+                    <td style={{ ...s.td, textAlign: 'left' }}>{r.商品名称}</td>
+                    <td style={s.td}>{(parseFloat(r['90天平均销售额']) || 0).toFixed(1)}</td>
+                    <td style={s.td}>{grossRate(r)}</td>
+                    <td style={s.td}>—</td>
+                    <td style={s.td}>
+                      <button
+                        style={{ ...s.adoptBtn, ...(isAdopted(r.商品代码) ? s.adoptOn : s.adoptOff) }}
+                        onClick={() => toggleAdopt(r.商品代码)}
+                      >
+                        {isAdopted(r.商品代码) ? '是' : '否'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Done button */}
-      <div style={s.doneRow}>
-        <button style={s.doneBtn} onClick={handleDone}>完成品类修改</button>
+      {/* Fixed footer: done button + store bar */}
+      <div style={s.fixedFooter}>
+        <div style={s.doneRow}>
+          <button style={s.doneBtn} onClick={handleDone}>完成品类修改</button>
+        </div>
+        <StoreBar storeId={storeId} data={data} fixed={false} />
       </div>
-
-      <StoreBar storeId={storeId} data={data} />
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
   page: {
-    minHeight: '100vh',
+    height: '100vh',
     background: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    paddingBottom: 72,
     fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    overflow: 'hidden',
+  },
+  fixedHeader: {
+    flexShrink: 0,
+    background: '#fff',
+    borderBottom: '1px solid #e0e0e0',
   },
   topBar: {
-    padding: '24px 24px 12px',
+    padding: '14px 24px 10px',
   },
   titlePill: {
     border: '1.5px solid #333',
     borderRadius: 30,
-    padding: '6px 20px',
-    fontSize: 16,
+    padding: '5px 18px',
+    fontSize: 15,
     fontWeight: 600,
     color: '#222',
   },
   tabsOuter: {
     overflowX: 'auto',
-    padding: '0 24px 12px',
-    scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch',
+    padding: '0 24px 10px',
+    scrollbarWidth: 'none' as React.CSSProperties['scrollbarWidth'],
+    WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
   },
   tabsInner: {
     display: 'flex',
@@ -231,13 +249,13 @@ const s: Record<string, React.CSSProperties> = {
     width: 'max-content',
   },
   tab: {
-    padding: '10px 24px',
+    padding: '8px 18px',
     border: '1px solid #e0e0e0',
     background: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     color: '#555',
     cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap' as React.CSSProperties['whiteSpace'],
     borderRadius: 0,
   },
   tabActive: {
@@ -246,25 +264,41 @@ const s: Record<string, React.CSSProperties> = {
     borderColor: '#f5b7b1',
     fontWeight: 600,
   },
+  colHeadersRow: {
+    display: 'flex',
+    gap: 12,
+    padding: '0 24px',
+  },
+  tableHeaderBox: {
+    flex: 1,
+    minWidth: 0,
+    border: '1px solid #d0d0d0',
+    borderRadius: '4px 4px 0 0',
+    overflow: 'hidden',
+  },
+  scrollArea: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 24px',
+    WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
+  },
   tablesRow: {
     display: 'flex',
-    gap: 16,
-    padding: '0 24px',
-    flex: 1,
-    overflowX: 'auto',
+    gap: 12,
   },
   tableBox: {
     flex: 1,
     minWidth: 0,
     border: '1px solid #d0d0d0',
-    borderRadius: 4,
+    borderTop: 'none',
+    borderRadius: '0 0 4px 4px',
     overflow: 'hidden',
   },
   tableTitle: {
     background: '#f7f7f7',
     borderBottom: '1px solid #d0d0d0',
-    padding: '8px 12px',
-    fontSize: 13,
+    padding: '7px 10px',
+    fontSize: 12,
     fontWeight: 600,
     color: '#333',
   },
@@ -272,29 +306,32 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: 12,
+    tableLayout: 'fixed',
   },
   th: {
     background: '#f0f0f0',
     borderRight: '1px solid #d0d0d0',
     borderBottom: '1px solid #d0d0d0',
-    padding: '8px 6px',
+    padding: '7px 5px',
     textAlign: 'center',
     fontWeight: 500,
     color: '#444',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap' as React.CSSProperties['whiteSpace'],
   },
   td: {
     borderRight: '1px solid #e8e8e8',
     borderBottom: '1px solid #eef0f8',
-    padding: '7px 6px',
+    padding: '7px 5px',
     textAlign: 'center',
     color: '#333',
     background: '#eef0f8',
+    verticalAlign: 'middle',
+    wordBreak: 'break-all' as React.CSSProperties['wordBreak'],
   },
   adoptBtn: {
     border: '1px solid #ccc',
     borderRadius: 4,
-    padding: '2px 10px',
+    padding: '2px 8px',
     fontSize: 12,
     cursor: 'pointer',
     fontWeight: 600,
@@ -309,17 +346,22 @@ const s: Record<string, React.CSSProperties> = {
     color: '#c0392b',
     borderColor: '#f5b7b1',
   },
+  fixedFooter: {
+    flexShrink: 0,
+    background: '#fff',
+  },
   doneRow: {
     display: 'flex',
     justifyContent: 'flex-end',
-    padding: '16px 24px',
+    padding: '10px 24px',
+    borderTop: '1px solid #e8e8e8',
   },
   doneBtn: {
     background: '#fff',
     border: '1.5px solid #9b9ecf',
     borderRadius: 30,
-    padding: '10px 28px',
-    fontSize: 15,
+    padding: '8px 24px',
+    fontSize: 14,
     color: '#555',
     cursor: 'pointer',
   },

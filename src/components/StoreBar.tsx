@@ -3,9 +3,10 @@ import type { SkuRow } from '../types'
 interface Props {
   storeId: string
   data: SkuRow[]
+  fixed?: boolean
 }
 
-export default function StoreBar({ storeId, data }: Props) {
+export default function StoreBar({ storeId, data, fixed = true }: Props) {
   const row = data[0]
   const city = row?.城市 ?? ''
   const district = row?.大区 ?? ''
@@ -18,8 +19,12 @@ export default function StoreBar({ storeId, data }: Props) {
 
   const allTags = [shangquan, snackTag ? `零食:${snackTag}` : '', ...storeTags].filter(Boolean)
 
+  const barStyle: React.CSSProperties = fixed
+    ? { ...s.bar, position: 'fixed', bottom: 0, left: 0, right: 0 }
+    : { ...s.bar, position: 'relative' }
+
   return (
-    <div style={s.bar}>
+    <div style={barStyle}>
       <div style={s.left}>
         <span style={s.storeId}>{storeId}</span>
         <span style={s.subtitle}>{subtitle}</span>
@@ -35,10 +40,6 @@ export default function StoreBar({ storeId, data }: Props) {
 
 const s: Record<string, React.CSSProperties> = {
   bar: {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
     background: '#e8735a',
     display: 'flex',
     alignItems: 'center',
