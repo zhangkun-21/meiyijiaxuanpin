@@ -17,20 +17,35 @@ export interface ScenarioStats {
   topBrands: string[]
 }
 
+export interface StoreInfo {
+  storeType: string      // 门店标签 e.g. "社区店", "商圈店"
+  tradingArea: string    // 主要商圈
+  city: string           // 城市
+  competitor: string     // 周边竞对 e.g. 零食店标签
+}
+
 export async function diagnoseShelf(
   storeId: string,
-  scenarios: ScenarioStats[]
+  scenarios: ScenarioStats[],
+  storeInfo: StoreInfo
 ): Promise<Record<string, AIDiagnosisResult>> {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY' || !MODEL || MODEL === 'YOUR_MODEL_ID') {
-    // Return mock data when API not configured
+    // Return mock data when API not configured - incorporate store info
+    const storeTypeHint = storeInfo.storeType || '社区店'
+    const competitorHint = storeInfo.competitor ? `，竞对主打零食` : ''
     return Object.fromEntries(
-      scenarios.map(s => [
-        s.name,
-        {
-          suggestedGroups: Math.max(1, s.currentGroups + (Math.random() > 0.5 ? 1 : -1)),
-          reason: `根据${s.name}品类的${s.productCount}个SKU销售数据分析，90天平均销售额约${s.avgSales90.toFixed(1)}元，建议${s.currentGroups > 3 ? '适当精简' : '适当扩充'}货架陈列空间以提升坪效。`,
-        },
-      ])
+      scenarios.map(s => {
+        const adjust = Math.random() > 0.5 ? 1 : -1
+        const suggestion = s.currentGroups + adjust
+        const reason = `${storeTypeHint}应${s.name === '日化' || s.name === '粮油冲调' ? '强化' : '优化'}${s.name}品类${competitorHint}，建议调整为${Math.max(1, suggestion)}组提升坪效。`
+        return [
+          s.name,
+          {
+            suggestedGroups: Math.max(1, suggestion),
+            reason,
+          },
+        ]
+      })
     )
   }
 
@@ -41,14 +56,25 @@ export async function diagnoseShelf(
     )
     .join('\n')
 
-  const prompt = `你是一名便利店货架优化专家。门店${storeId}当前货架情况如下：
+  const storeDesc = [
+    storeInfo.storeType && `店型：${storeInfo.storeType}`,
+    storeInfo.tradingArea && `商圈：${storeInfo.tradingArea}`,
+    storeInfo.city && `城市：${storeInfo.city}`,
+    storeInfo.competitor && `周边竞对：${storeInfo.competitor}`,
+  ].filter(Boolean).join('，')
 
+  const prompt = `你是一名便利店货架优化专家。门店${storeId}的属性如下：
+${storeDesc || '普通社区店'}
+
+当前货架情况：
 ${scenarioText}
 
-请根据以上数据，对每个场景给出货架组数调整建议。要求：
-1. 建议组数合理（1-10组之间）
-2. 给出简短的调整理由（50字以内）
-3. 以JSON数组格式返回，格式如下：
+请根据门店属性（店型、商圈、竞对）和各品类销售数据，给出货架组数调整建议。要求：
+1. 根据店型特点判断应主打什么品类（如社区店主打日用、商圈店主打休闲零食等）
+2. 考虑周边竞对情况，差异化布局（如竞对主打零食则可强化其他品类）
+3. 建议组数合理（1-10组之间）
+4. 给出简短的调整理由（50字以内），需说明为什么该店型适合这样调整
+5. 以JSON数组格式返回：
 [{"scene": "场景名", "suggestedGroups": 数字, "reason": "理由"}]
 
 只返回JSON，不要其他内容。`

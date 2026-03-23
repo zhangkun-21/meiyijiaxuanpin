@@ -48,6 +48,18 @@ export default function ShelfPage() {
   const [diagnosed, setDiagnosed] = useState(false)
   const [diagError, setDiagError] = useState<string | null>(null)
 
+  // Extract store attributes from data (first row with matching store)
+  const storeInfo = useMemo(() => {
+    const row = data.find(r => r.店号 === storeId) ?? data[0]
+    if (!row) return { storeType: '', tradingArea: '', city: '', competitor: '' }
+    return {
+      storeType: row.门店标签 || '',
+      tradingArea: row.主要商圈 || '',
+      city: row.城市 || '',
+      competitor: row.零食店标签 || '', // competitor info from snack store tag
+    }
+  }, [data, storeId])
+
   const scenarioStats = useMemo(() => {
     return scenarios.map(s => {
       const keywords = SCENARIO_MAP[s.name] ?? [s.name]
@@ -71,7 +83,7 @@ export default function ShelfPage() {
     setDiagnosing(true)
     setDiagError(null)
     try {
-      const results = await diagnoseShelf(storeId, scenarioStats)
+      const results = await diagnoseShelf(storeId, scenarioStats, storeInfo)
       setScenarios(prev =>
         prev.map(s => ({
           ...s,
