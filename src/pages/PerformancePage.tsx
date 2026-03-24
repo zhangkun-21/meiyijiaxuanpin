@@ -35,14 +35,6 @@ export default function PerformancePage() {
       })
   }, [storeId])
 
-  const metrics = prediction
-    ? [
-        { label: '动销率将提升', value: prediction.salesRateIncrease },
-        { label: '毛利率将提升', value: prediction.grossMarginIncrease },
-        { label: '积压库存将减少', value: prediction.inventoryReduction },
-      ]
-    : []
-
   return (
     <div style={s.page}>
       {/* Fixed header */}
@@ -60,23 +52,66 @@ export default function PerformancePage() {
         {loading ? (
           <div style={s.loadingBox}>
             <div style={s.spinner} />
-            <p style={s.loadingText}>AI正在分析业绩提升预期...</p>
+            <p style={s.loadingText}>正在计算业绩变化...</p>
           </div>
         ) : error ? (
           <p style={s.errorText}>{error}</p>
-        ) : (
+        ) : prediction && (
           <>
-            <p style={s.intro}>使用最新选品策略后：</p>
-            <div style={s.metricsRow}>
-              {metrics.map(m => (
-                <div key={m.label} style={s.metricPill}>
-                  {m.label}<span style={s.metricValue}>{m.value}</span>
-                </div>
-              ))}
+            {/* Summary counts */}
+            <div style={s.countRow}>
+              <div style={s.countBox}>
+                <span style={s.countLabel}>下架商品</span>
+                <span style={s.countValue}>{prediction.delistCount}个</span>
+              </div>
+              <div style={s.countBox}>
+                <span style={s.countLabel}>上架商品</span>
+                <span style={s.countValue}>{prediction.listCount}个</span>
+              </div>
             </div>
-            {prediction?.summary && (
-              <p style={s.summary}>{prediction.summary}</p>
-            )}
+
+            {/* Detail breakdown */}
+            <div style={s.detailSection}>
+              <div style={s.detailTitle}>下架商品数据</div>
+              <div style={s.detailRow}>
+                <span>90天销售额：{prediction.delistSales.toFixed(0)}元</span>
+                <span>平均毛利率：{prediction.delistMargin.toFixed(1)}%</span>
+              </div>
+            </div>
+
+            <div style={s.detailSection}>
+              <div style={s.detailTitle}>上架商品数据</div>
+              <div style={s.detailRow}>
+                <span>90天销售额：{prediction.listSales.toFixed(0)}元</span>
+                <span>平均毛利率：{prediction.listMargin.toFixed(1)}%</span>
+              </div>
+            </div>
+
+            {/* Predicted changes */}
+            <div style={s.changeSection}>
+              <div style={s.changeTitle}>预计业绩变化</div>
+              <div style={s.changeRow}>
+                <div style={s.changePill}>
+                  <span>销售额</span>
+                  <span style={{ color: prediction.salesChange >= 0 ? '#27ae60' : '#c0392b', fontWeight: 700 }}>
+                    {prediction.salesChange >= 0 ? '+' : ''}{prediction.salesChange.toFixed(0)}元
+                  </span>
+                </div>
+                <div style={s.changePill}>
+                  <span>毛利率</span>
+                  <span style={{ color: prediction.marginChange >= 0 ? '#27ae60' : '#c0392b', fontWeight: 700 }}>
+                    {prediction.marginChange >= 0 ? '+' : ''}{prediction.marginChange.toFixed(1)}%
+                  </span>
+                </div>
+                <div style={s.changePill}>
+                  <span>减少积压SKU</span>
+                  <span style={{ color: '#27ae60', fontWeight: 700 }}>{prediction.inventoryReduction}个</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary text */}
+            <p style={s.summary}>{prediction.summary}</p>
           </>
         )}
       </div>
@@ -163,32 +198,77 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 15,
     color: '#c0392b',
   },
-  intro: {
-    fontSize: 16,
-    color: '#333',
-    margin: 0,
-    textAlign: 'center',
-  },
-  metricsRow: {
+  countRow: {
     display: 'flex',
-    gap: 20,
-    flexWrap: 'wrap',
+    gap: 24,
     justifyContent: 'center',
   },
-  metricPill: {
-    border: '1.5px solid #ccc',
-    borderRadius: 30,
-    padding: '10px 24px',
-    fontSize: 15,
-    color: '#333',
+  countBox: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    padding: '12px 24px',
+    border: '1.5px solid #ddd',
+    borderRadius: 8,
+    minWidth: 100,
   },
-  metricValue: {
-    color: '#e8735a',
+  countLabel: {
+    fontSize: 13,
+    color: '#666',
+  },
+  countValue: {
+    fontSize: 20,
     fontWeight: 700,
-    fontSize: 17,
+    color: '#e8735a',
+  },
+  detailSection: {
+    width: '100%',
+    maxWidth: 400,
+    padding: '12px 16px',
+    background: '#f8f9fa',
+    borderRadius: 8,
+  },
+  detailTitle: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#555',
+    marginBottom: 8,
+  },
+  detailRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: 14,
+    color: '#333',
+  },
+  changeSection: {
+    width: '100%',
+    maxWidth: 400,
+  },
+  changeTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  changeRow: {
+    display: 'flex',
+    gap: 12,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  changePill: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    padding: '10px 16px',
+    border: '1.5px solid #ccc',
+    borderRadius: 8,
+    minWidth: 90,
+    fontSize: 13,
+    color: '#555',
   },
   summary: {
     fontSize: 14,

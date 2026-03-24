@@ -170,102 +170,75 @@ ${scenarioText}
 // ------- Performance Prediction -------
 
 export interface PerformancePrediction {
-  salesRateIncrease: string    // e.g. "5%"
-  grossMarginIncrease: string  // e.g. "3%"
-  inventoryReduction: string   // e.g. "80个"
-  summary: string              // AI-generated summary
+  // Counts
+  delistCount: number          // 采纳下架的商品数
+  listCount: number            // 采纳上架的商品数
+  // Calculated from actual data
+  delistSales: number          // 下架商品原90天销售额合计
+  listSales: number            // 上架商品90天销售额合计
+  delistMargin: number         // 下架商品平均毛利率
+  listMargin: number           // 上架商品平均毛利率
+  // Predicted changes
+  salesChange: number          // 预计销售额变化（正数=增加）
+  marginChange: number         // 预计毛利率变化（正数=增加）
+  inventoryReduction: number   // 预计减少积压库存数
+  summary: string              // 总结文案
+}
+
+// Helper to parse margin percentage
+function parseMargin(val: string | undefined): number {
+  if (!val) return 0
+  const n = parseFloat(val)
+  if (isNaN(n)) return 0
+  return Math.abs(n) < 1.5 ? n * 100 : n
 }
 
 export async function predictPerformance(
-  storeId: string,
+  _storeId: string,
   selections: ProductSelection[]
 ): Promise<PerformancePrediction> {
-  // Separate adopted delist vs adopted list items
-  const delistAdopted = selections.filter(s => {
-    const discontinued = s.sku.是否总仓淘汰 === '是' || s.sku.是否总仓淘汰 === '1'
-    const lowGrade = s.sku.销售分级 === 'BC'
-    return (discontinued || lowGrade) && s.adopted
-  })
-  const listAdopted = selections.filter(s => {
-    const discontinued = s.sku.是否总仓淘汰 === '是' || s.sku.是否总仓淘汰 === '1'
-    const lowGrade = s.sku.销售分级 === 'BC'
-    return !(discontinued || lowGrade) && s.adopted
-  })
+  // Filter by type and adopted status
+  const delistAdopted = selections.filter(s => s.type === 'delist' && s.adopted)
+  const listAdopted = selections.filter(s => s.type === 'list' && s.adopted)
 
-  const delistSales = delistAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
-  const listSales = listAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
   const delistCount = delistAdopted.length
   const listCount = listAdopted.length
 
-  if (!API_KEY || API_KEY === 'YOUR_API_KEY' || !MODEL || MODEL === 'YOUR_MODEL_ID') {
-    // Mock prediction
-    const salesRate = (2 + Math.random() * 6).toFixed(1)
-    const margin = (1 + Math.random() * 4).toFixed(1)
-    const inv = Math.round(30 + Math.random() * 120)
-    return {
-      salesRateIncrease: `${salesRate}%`,
-      grossMarginIncrease: `${margin}%`,
-      inventoryReduction: `${inv}个`,
-      summary: `通过下架${delistCount}个低效SKU、保留${listCount}个优质商品，预计门店坪效和动销率将显著提升。`,
-    }
-  }
+  // Calculate actual sales figures
+  const delistSales = delistAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
+  const listSales = listAdopted.reduce((sum, s) => sum + (parseFloat(s.sku['90天平均销售额']) || 0), 0)
 
-  const prompt = `你是一名便利店选品分析专家。门店${storeId}完成了以下选品调整：
+  // Calculate average margins
+  const delistMarginSum = delistAdopted.reduce((sum, s) => sum + parseMargin(s.sku.当前毛利率), 0)
+  const listMarginSum = listAdopted.reduce((sum, s) => sum + parseMargin(s.sku.当前毛利率), 0)
+  const delistMargin = delistCount > 0 ? delistMarginSum / delistCount : 0
+  const listMargin = listCount > 0 ? listMarginSum / listCount : 0
 
-- 采纳下架建议的商品数量：${delistCount}个，涉及90天销售额约${delistSales.toFixed(0)}元
-- 保留上架的商品数量：${listCount}个，涉及90天销售额约${listSales.toFixed(0)}元
+  // Calculate predicted changes based on actual data
+  // 下架低效品后，货架空间让给高效品，销售额预计变化 = 上架品销售额 - 下架品销售额
+  const salesChange = listSales - delistSales
 
-请根据以上数据，预测选品调整后的业绩提升效果。要求：
-1. 动销率提升百分比（如5%）
-2. 毛利率提升百分比（如3%）
-3. 积压库存减少数量（如80个）
-4. 简短总结（50字以内）
+  // 毛利率变化 = 上架品平均毛利率 - 下架品平均毛利率
+  const marginChange = listMargin - delistMargin
 
-以JSON格式返回：
-{"salesRateIncrease": "X%", "grossMarginIncrease": "X%", "inventoryReduction": "X个", "summary": "..."}
+  // 积压库存减少 = 下架商品数（每个低效SKU约积压若干库存）
+  const inventoryReduction = delistCount
 
-只返回JSON，不要其他内容。`
-
-  const response = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: (!MODEL || MODEL === 'YOUR_MODEL_ID') ? ENDPOINT_RAW : MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      thinking: { type: "disabled" },
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`API请求失败: ${response.status}`)
-  }
-
-  const json = await response.json()
-  const content: string = json.choices?.[0]?.message?.content ?? '{}'
-
-  try {
-    const match = content.match(/\{[\s\S]*\}/)
-    if (match) {
-      const parsed = JSON.parse(match[0]) as PerformancePrediction
-      return {
-        salesRateIncrease: parsed.salesRateIncrease ?? '5%',
-        grossMarginIncrease: parsed.grossMarginIncrease ?? '3%',
-        inventoryReduction: parsed.inventoryReduction ?? '50个',
-        summary: parsed.summary ?? '选品优化后预计业绩将显著提升。',
-      }
-    }
-  } catch {
-    // fallback
-  }
+  // Generate summary
+  const salesDir = salesChange >= 0 ? '增加' : '减少'
+  const marginDir = marginChange >= 0 ? '提升' : '下降'
+  const summary = `下架${delistCount}个低效品（销售额${delistSales.toFixed(0)}元，毛利${delistMargin.toFixed(1)}%），上架${listCount}个优质品（销售额${listSales.toFixed(0)}元，毛利${listMargin.toFixed(1)}%）。预计销售额${salesDir}${Math.abs(salesChange).toFixed(0)}元，毛利率${marginDir}${Math.abs(marginChange).toFixed(1)}个百分点。`
 
   return {
-    salesRateIncrease: '5%',
-    grossMarginIncrease: '3%',
-    inventoryReduction: '50个',
-    summary: '选品优化后预计业绩将显著提升。',
+    delistCount,
+    listCount,
+    delistSales,
+    listSales,
+    delistMargin,
+    listMargin,
+    salesChange,
+    marginChange,
+    inventoryReduction,
+    summary,
   }
 }
