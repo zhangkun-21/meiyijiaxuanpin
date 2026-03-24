@@ -99,8 +99,56 @@ export default function ShelfPage() {
     }
   }
 
+  const totalGroups = useMemo(
+    () => scenarios.reduce((sum, s) => sum + s.currentGroups, 0),
+    [scenarios]
+  )
+
+  const confirmedTotal = useMemo(
+    () => scenarios.reduce((sum, s) => sum + s.confirmedGroups, 0),
+    [scenarios]
+  )
+
   const handleConfirmedChange = (name: string, val: number) => {
-    setScenarios(prev => prev.map(s => s.name === name ? { ...s, confirmedGroups: val } : s))
+    const newVal = Math.max(0, val)
+    setScenarios(prev => {
+      const current = prev.find(s => s.name === name)!.confirmedGroups
+      const diff = newVal - current // how much this scenario changed
+      if (diff === 0) return prev
+
+      // Find other scenarios to absorb the diff (take from largest, give to largest deficit)
+      const others = prev.filter(s => s.name !== name)
+      let remaining = diff
+      const updated = others.map(s => ({ ...s }))
+
+      if (diff > 0) {
+        // This scenario grew: reduce from others with most groups first
+        updated.sort((a, b) => b.confirmedGroups - a.confirmedGroups)
+        for (const o of updated) {
+          const canReduce = Math.max(0, o.confirmedGroups - 1)
+          const reduce = Math.min(remaining, canReduce)
+          o.confirmedGroups -= reduce
+          remaining -= reduce
+          if (remaining === 0) break
+        }
+      } else {
+        // This scenario shrank: add to others with fewest groups first
+        updated.sort((a, b) => a.confirmedGroups - b.confirmedGroups)
+        let toAdd = -diff
+        for (const o of updated) {
+          const add = Math.ceil(toAdd / (updated.length))
+          o.confirmedGroups += add
+          toAdd -= add
+          if (toAdd <= 0) break
+        }
+      }
+
+      return prev.map(s => {
+        if (s.name === name) return { ...s, confirmedGroups: newVal }
+        const found = updated.find(u => u.name === s.name)
+        return found ? { ...s, confirmedGroups: Math.max(0, found.confirmedGroups) } : s
+      })
+    })
   }
 
   return (
@@ -176,8 +224,14 @@ export default function ShelfPage() {
 
       {/* Fixed footer: Apply button + StoreBar */}
       <div style={s.fixedFooter}>
+        <div style={s.totalHint}>
+          总货架组数：{confirmedTotal} / {totalGroups}组
+          {confirmedTotal !== totalGroups && <span style={{ color: '#c0392b', marginLeft: 8 }}>（总数已变，请调整）</span>}
+        </div>
         <div style={s.applyRow}>
-          <button style={s.applyBtn} onClick={() => {
+          <button style={{ ...s.applyBtn, ...(confirmedTotal !== totalGroups ? s.applyBtnDisabled : {}) }}
+            disabled={confirmedTotal !== totalGroups}
+            onClick={() => {
             // Persist shelf adjustment deltas for ProductPage to consume
             const shelfResult = scenarios.map(s => ({
               name: s.name,
@@ -187,7 +241,8 @@ export default function ShelfPage() {
             }))
             sessionStorage.setItem('shelfResult', JSON.stringify(shelfResult))
             navigate(`/products?store=${encodeURIComponent(storeId)}`)
-          }}>
+          }}
+          >
             应用
           </button>
         </div>
@@ -326,10 +381,15 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     background: '#fff',
   },
+  totalHint: {
+    padding: '6px 24px 0',
+    fontSize: 12,
+    color: '#666',
+  },
   applyRow: {
     display: 'flex',
     justifyContent: 'flex-end',
-    padding: '10px 24px',
+    padding: '8px 24px 10px',
     borderTop: '1px solid #e8e8e8',
   },
   applyBtn: {
@@ -340,5 +400,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 15,
     color: '#555',
     cursor: 'pointer',
+  },
+  applyBtnDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
   },
 }

@@ -203,7 +203,11 @@ export default function ProductPage() {
         {/* Shelf delta hint */}
         {shelfDeltas[activeScenario] !== undefined && (
           <div style={s.deltaHint}>
-            建议下架 {delist.length} 个 · 建议上架 {listCount} 个
+            {(() => {
+              const delta = shelfDeltas[activeScenario]
+              const deltaStr = delta > 0 ? `+${delta}组` : delta < 0 ? `${delta}组` : '不变'
+              return `货架${deltaStr} · 建议下架 ${delist.length} 个 · 建议上架 ${listCount} 个`
+            })()}
           </div>
         )}
 
