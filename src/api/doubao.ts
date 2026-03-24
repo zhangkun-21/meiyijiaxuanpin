@@ -113,7 +113,7 @@ ${scenarioText}
 - 若有零食竞对，可压缩休闲零食，强化差异化品类
 - 销售额低于均值的品类应酌情压缩
 
-第���步：计算初稿总和，与${totalCurrentGroups}比较，算出差值。
+第二步：计算初稿总和，与${totalCurrentGroups}比较，算出差值。
 - 例如初稿总和=${totalCurrentGroups + 2}，则多了2组，需要从某些品类各减1组
 - 例如初稿总和=${totalCurrentGroups - 2}，则少了2组，需要给某些品类各加1组
 - 微调规则：社区店优先给日化/粮油加组或从休闲减组；商圈店优先给大休闲/小零食加组或从日化减组
@@ -240,67 +240,5 @@ export async function predictPerformance(
     marginChange,
     inventoryReduction,
     summary,
-  }
-}
-}
-  }
-
-  const prompt = `你是一名便利店选品分析专家。门店${storeId}完成了以下选品调整：
-
-- 采纳下架建议的商品数量：${delistCount}个，涉及90天销售额��${delistSales.toFixed(0)}元
-- 保留上架的商品数量：${listCount}个，涉及90天销售额约${listSales.toFixed(0)}元
-
-请根据以上数据，预测选品调整后的业绩提升效果。要求：
-1. 动销率提升百分比（如5%）
-2. 毛利率提升百分比（如3%）
-3. 积压库存减少数量（如80个）
-4. 简短总结（50字以内）
-
-以JSON格式返回：
-{"salesRateIncrease": "X%", "grossMarginIncrease": "X%", "inventoryReduction": "X个", "summary": "..."}
-
-只返回JSON，不要其他内容。`
-
-  const response = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: (!MODEL || MODEL === 'YOUR_MODEL_ID') ? ENDPOINT_RAW : MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      thinking: { type: "disabled" },
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`API请求失败: ${response.status}`)
-  }
-
-  const json = await response.json()
-  const content: string = json.choices?.[0]?.message?.content ?? '{}'
-
-  try {
-    const match = content.match(/\{[\s\S]*\}/)
-    if (match) {
-      const parsed = JSON.parse(match[0]) as PerformancePrediction
-      return {
-        salesRateIncrease: parsed.salesRateIncrease ?? '5%',
-        grossMarginIncrease: parsed.grossMarginIncrease ?? '3%',
-        inventoryReduction: parsed.inventoryReduction ?? '50个',
-        summary: parsed.summary ?? '选品优化后预计业绩将显著提升。',
-      }
-    }
-  } catch {
-    // fallback
-  }
-
-  return {
-    salesRateIncrease: '5%',
-    grossMarginIncrease: '3%',
-    inventoryReduction: '50个',
-    summary: '选品优化后预计业绩将显著提升。',
   }
 }
