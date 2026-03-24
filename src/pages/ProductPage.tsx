@@ -166,15 +166,8 @@ export default function ProductPage() {
   const handleDone = () => {
     const selections: ProductSelection[] = []
     for (const name of SCENARIO_NAMES) {
-      const delta = shelfDeltas[name] ?? 0
-      const { delist: sceneDelist, list: sceneList } = classifyProducts(filterByScenario(data, name), delta)
-      // Add delist items with type
-      sceneDelist.forEach(sku => {
-        selections.push({ sku, adopted: isAdopted(sku.商品代码), type: 'delist' })
-      })
-      // Add list items with type
-      sceneList.forEach(sku => {
-        selections.push({ sku, adopted: isAdopted(sku.商品代码), type: 'list' })
+      filterByScenario(data, name).forEach(sku => {
+        selections.push({ sku, adopted: isAdopted(sku.商品代码) })
       })
     }
     sessionStorage.setItem('productSelections', JSON.stringify(selections))
