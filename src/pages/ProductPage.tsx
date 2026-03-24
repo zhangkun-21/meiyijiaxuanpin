@@ -40,36 +40,45 @@ function parsePct(val: string | undefined): number {
   if (!val) return 0
   const n = parseFloat(val)
   if (isNaN(n)) return 0
-  // If stored as decimal (e.g. 0.12 meaning 12%), convert
   return Math.abs(n) < 1.5 ? n * 100 : n
 }
 
-// Generate a human-readable delist reason based on data (no sales grade)
+// Generate a human-readable delist reason based on sales velocity only
 function delistReasonText(r: SkuRow): string {
   const discontinued = r.是否总仓淘汰 === '是' || r.是否总仓淘汰 === '1'
   if (discontinued) return '总仓已淘汰'
   const sales = parseFloat(r['90天平均销售额']) || 0
   const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
-  const margin = parsePct(r.当前毛利率)
-  const isLowSales = avg > 0 && sales < avg * 0.5
-  const isLowMargin = margin < 15 && margin > 0
-  if (isLowSales && isLowMargin) return '动销不足且毛利偏低'
-  if (isLowSales) return '动销不足，低于品类均值50%'
-  if (isLowMargin) return '毛利率低于15%'
-  return '综合表现偏弱'
+  const ratio = avg > 0 ? sales / avg : 1
+  if (ratio < 0.3) return `动销严重不足，仅为品类均值${(ratio * 100).toFixed(0)}%`
+  if (ratio < 0.5) return `动销不足，为品类均值${(ratio * 100).toFixed(0)}%`
+  return '动销低于品类水平'
 }
 
-// Generate a human-readable list reason (top 10 by sales + margin)
+// Generate a human-readable list reason based on sales rank
 function listReasonText(r: SkuRow, rank: number): string {
-  const margin = parsePct(r.当前毛利率)
   const sales = parseFloat(r['90天平均销售额']) || 0
-  return `品类TOP${rank}，销售额${sales.toFixed(0)}元，毛利${margin.toFixed(1)}%`
+  const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
+  const pct = avg > 0 ? ((sales / avg) * 100).toFixed(0) : '—'
+  return `品类销售TOP${rank}，销售额${sales.toFixed(0)}元（均值${pct}%）`
 }
 
-// Classify products by sales velocity and margin data (no sales grade)
-// 建议下架: 总仓淘汰 OR (动销低于品类均值50% AND 毛利<15%)
-// 建议上架: 该品类销售额和毛利率综合排名前10的商品
-function classifyProducts(rows: SkuRow[]) {
+interface ShelfDelta { name: string; delta: number }
+
+// Classify products based purely on sales velocity vs category average.
+// delta: shelf group change from ShelfPage (positive = expand, negative = shrink).
+//   delta < 0  → more aggressive delisting, fewer listing slots
+//   delta > 0  → standard delisting, more listing slots
+//   delta = 0  → standard (10 list slots, threshold 50% of avg)
+function classifyProducts(rows: SkuRow[], delta: number) {
+  // Adjust delist threshold: shrinking shelf → lower the bar (more products delisted)
+  // delta -2 → threshold 70%, delta -1 → 60%, 0 → 50%, +1 → 40%, +2 → 30%
+  const delistThreshold = Math.max(0.2, Math.min(0.8, 0.5 - delta * 0.1))
+
+  // Adjust list count: shrinking shelf → fewer recommendations
+  const baseListCount = 10
+  const listCount = Math.max(3, baseListCount + delta * 2)
+
   const delist: SkuRow[] = []
   const candidates: SkuRow[] = []
 
@@ -77,34 +86,23 @@ function classifyProducts(rows: SkuRow[]) {
     const discontinued = r.是否总仓淘汰 === '是' || r.是否总仓淘汰 === '1'
     const sales = parseFloat(r['90天平均销售额']) || 0
     const avg = parseFloat(r['品类平均值（90天平均销售额）']) || 0
-    const margin = parsePct(r.当前毛利率)
-    const isLowSales = avg > 0 && sales < avg * 0.5
-    const isLowMargin = margin > 0 && margin < 15
+    const isLowSales = avg > 0 && sales < avg * delistThreshold
 
-    if (discontinued || (isLowSales && isLowMargin)) {
+    if (discontinued || isLowSales) {
       delist.push(r)
     } else {
       candidates.push(r)
     }
   }
 
-  // Sort candidates by combined score: sales + margin weight
-  // Normalize sales to a 0-100 scale based on max in category, then add margin (already 0-100)
-  const maxSales = Math.max(...candidates.map(r => parseFloat(r['90天平均销售额']) || 0), 1)
-  const scored = candidates.map(r => {
-    const sales = parseFloat(r['90天平均销售额']) || 0
-    const margin = parsePct(r.当前毛利率)
-    const salesScore = (sales / maxSales) * 100
-    const combinedScore = salesScore * 0.6 + margin * 0.4 // 60% sales, 40% margin
-    return { row: r, score: combinedScore }
-  })
+  // Sort candidates by sales only (no margin), take top N
+  candidates.sort((a, b) =>
+    (parseFloat(b['90天平均销售额']) || 0) - (parseFloat(a['90天平均销售额']) || 0)
+  )
 
-  scored.sort((a, b) => b.score - a.score)
+  const list = candidates.slice(0, listCount)
 
-  // Take top 10 as list recommendations
-  const list = scored.slice(0, 10).map(s => s.row)
-
-  return { delist, list }
+  return { delist, list, delistThreshold, listCount }
 }
 
 const DELIST_HEADERS: React.ReactNode[] = [
@@ -125,6 +123,18 @@ const LIST_HEADERS: React.ReactNode[] = [
   <>是否<br />采纳</>,
 ]
 
+// Load shelf deltas saved by ShelfPage; keyed by scenario name
+function loadShelfDeltas(): Record<string, number> {
+  try {
+    const raw = sessionStorage.getItem('shelfResult')
+    if (!raw) return {}
+    const arr: ShelfDelta[] = JSON.parse(raw)
+    return Object.fromEntries(arr.map(s => [s.name, s.delta]))
+  } catch {
+    return {}
+  }
+}
+
 export default function ProductPage() {
   const [searchParams] = useSearchParams()
   const storeId = searchParams.get('store') ?? ''
@@ -134,10 +144,13 @@ export default function ProductPage() {
   const [activeScenario, setActiveScenario] = useState(SCENARIO_NAMES[0])
   const [adopted, setAdopted] = useState<Record<string, boolean>>({})
 
-  const { delist, list } = useMemo(
-    () => classifyProducts(filterByScenario(data, activeScenario)),
-    [data, activeScenario]
-  )
+  // Shelf deltas from ShelfPage (loaded once on mount)
+  const shelfDeltas = useMemo(() => loadShelfDeltas(), [])
+
+  const { delist, list, delistThreshold, listCount } = useMemo(() => {
+    const delta = shelfDeltas[activeScenario] ?? 0
+    return classifyProducts(filterByScenario(data, activeScenario), delta)
+  }, [data, activeScenario, shelfDeltas])
 
   const toggleAdopt = (code: string) => {
     setAdopted(prev => ({ ...prev, [code]: !(prev[code] ?? true) }))
@@ -154,18 +167,6 @@ export default function ProductPage() {
     }
     sessionStorage.setItem('productSelections', JSON.stringify(selections))
     navigate(`/performance?store=${encodeURIComponent(storeId)}`)
-  }
-
-  const grossRate = (r: SkuRow) => {
-    const v = parseFloat(r.当前毛利率)
-    return isNaN(v) ? '—' : `${(v * 100).toFixed(1)}%`
-  }
-
-  const delistReason = (r: SkuRow) => {
-    const parts: string[] = []
-    if (r.是否总仓淘汰 === '是' || r.是否总仓淘汰 === '1') parts.push('总仓淘汰')
-    if (r.销售分级 === 'BC') parts.push('销售评级BC')
-    return parts.join('、') || '—'
   }
 
   return (
@@ -193,6 +194,20 @@ export default function ProductPage() {
             ))}
           </div>
         </div>
+
+        {/* Shelf delta hint */}
+        {(() => {
+          const delta = shelfDeltas[activeScenario] ?? 0
+          if (delta === 0 && !shelfDeltas[activeScenario]) return null
+          const label = delta > 0
+            ? `货架+${delta}组 · 上架推荐${listCount}个，下架阈值宽松`
+            : delta < 0
+            ? `货架${delta}组 · 上架推荐${listCount}个，下架阈值从严`
+            : `货架组数不变 · 上架推荐${listCount}个`
+          return (
+            <div style={s.deltaHint}>{label}</div>
+          )
+        })()}
 
       </div>
 
@@ -354,6 +369,11 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 15,
     fontWeight: 600,
     color: '#222',
+  },
+  deltaHint: {
+    padding: '4px 24px 8px',
+    fontSize: 12,
+    color: '#888',
   },
   tabsOuter: {
     overflowX: 'auto',

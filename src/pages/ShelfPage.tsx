@@ -177,7 +177,17 @@ export default function ShelfPage() {
       {/* Fixed footer: Apply button + StoreBar */}
       <div style={s.fixedFooter}>
         <div style={s.applyRow}>
-          <button style={s.applyBtn} onClick={() => navigate(`/products?store=${encodeURIComponent(storeId)}`)}>
+          <button style={s.applyBtn} onClick={() => {
+            // Persist shelf adjustment deltas for ProductPage to consume
+            const shelfResult = scenarios.map(s => ({
+              name: s.name,
+              currentGroups: s.currentGroups,
+              confirmedGroups: s.confirmedGroups,
+              delta: s.confirmedGroups - s.currentGroups,
+            }))
+            sessionStorage.setItem('shelfResult', JSON.stringify(shelfResult))
+            navigate(`/products?store=${encodeURIComponent(storeId)}`)
+          }}>
             应用
           </button>
         </div>
