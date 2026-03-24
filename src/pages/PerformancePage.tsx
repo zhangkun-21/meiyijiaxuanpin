@@ -64,7 +64,7 @@ export default function PerformancePage() {
               <div style={s.changeTitle}>预计业绩变化</div>
               <div style={s.changeRow}>
                 <div style={s.changePill}>
-                  <span>销售额</span>
+                  <span>日均销售额</span>
                   <span style={{ color: prediction.salesChange >= 0 ? '#27ae60' : '#c0392b', fontWeight: 700 }}>
                     {prediction.salesChange >= 0 ? '+' : ''}{prediction.salesChange.toFixed(0)}元
                   </span>

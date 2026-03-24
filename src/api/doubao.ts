@@ -227,7 +227,7 @@ export async function predictPerformance(
   // Generate summary
   const salesDir = salesChange >= 0 ? '增加' : '减少'
   const marginDir = marginChange >= 0 ? '提升' : '下降'
-  const summary = `下架${delistCount}个低效品（销售额${delistSales.toFixed(0)}元，毛利${delistMargin.toFixed(1)}%），上架${listCount}个优质品（销售额${listSales.toFixed(0)}元，毛利${listMargin.toFixed(1)}%）。预计销售额${salesDir}${Math.abs(salesChange).toFixed(0)}元，毛利率${marginDir}${Math.abs(marginChange).toFixed(1)}个百分点。`
+  const summary = `下架${delistCount}个低效品（日均销售额${delistSales.toFixed(0)}元，毛利${delistMargin.toFixed(1)}%），上架${listCount}个优质品（日均销售额${listSales.toFixed(0)}元，毛利${listMargin.toFixed(1)}%）。预计日均销售额${salesDir}${Math.abs(salesChange).toFixed(0)}元，毛利率${marginDir}${Math.abs(marginChange).toFixed(1)}个百分点。`
 
   return {
     delistCount,
