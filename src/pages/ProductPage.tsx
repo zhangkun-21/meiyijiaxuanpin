@@ -100,9 +100,14 @@ function classifyProducts(rows: SkuRow[], delta: number) {
     (parseFloat(b['90天平均销售额']) || 0) - (parseFloat(a['90天平均销售额']) || 0)
   )
 
-  const list = candidates.slice(0, listCount)
+  // When shelf shrinks, list count must not exceed delist count
+  const effectiveListCount = delta < 0
+    ? Math.min(listCount, delist.length)
+    : listCount
 
-  return { delist, list, delistThreshold, listCount }
+  const list = candidates.slice(0, effectiveListCount)
+
+  return { delist, list, delistThreshold, listCount: effectiveListCount }
 }
 
 const DELIST_HEADERS: React.ReactNode[] = [
@@ -196,18 +201,11 @@ export default function ProductPage() {
         </div>
 
         {/* Shelf delta hint */}
-        {(() => {
-          const delta = shelfDeltas[activeScenario] ?? 0
-          if (delta === 0 && !shelfDeltas[activeScenario]) return null
-          const label = delta > 0
-            ? `货架+${delta}组 · 上架推荐${listCount}个，下架阈值宽松`
-            : delta < 0
-            ? `货架${delta}组 · 上架推荐${listCount}个，下架阈值从严`
-            : `货架组数不变 · 上架推荐${listCount}个`
-          return (
-            <div style={s.deltaHint}>{label}</div>
-          )
-        })()}
+        {shelfDeltas[activeScenario] !== undefined && (
+          <div style={s.deltaHint}>
+            建议下架 {delist.length} 个 · 建议上架 {listCount} 个
+          </div>
+        )}
 
       </div>
 
