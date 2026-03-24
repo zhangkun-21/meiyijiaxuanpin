@@ -73,4 +73,5 @@ export interface AIDiagnosisResult {
 export interface ProductSelection {
   sku: SkuRow
   adopted: boolean
+  type: 'delist' | 'list'  // 下架建议 or 上架建议
 }
