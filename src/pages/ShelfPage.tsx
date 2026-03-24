@@ -26,9 +26,9 @@ const SCENARIO_MAP: Record<string, string[]> = {
 }
 
 const MOCK_GROUPS: Record<string, number> = {
-  '酒': 2, '潮玩': 0, '粮油冲调': 1, '方便食品': 2, '糖巧': 1,
-  '小零食': 2, '大休闲': 1, '饼干': 1, '膨化': 1, '日化': 2,
-  '烘焙常温奶': 2, '促销爆品': 1,
+  '酒': 1, '潮玩': 2, '粮油冲调': 1, '方便食品': 2, '糖巧': 1,
+  '小零食': 3, '大休闲': 6, '饼干': 1, '膨化': 1, '日化': 2,
+  '烘焙常温奶': 1, '促销爆品': 1,
 }
 
 export default function ShelfPage() {
@@ -47,6 +47,18 @@ export default function ShelfPage() {
   const [diagnosing, setDiagnosing] = useState(false)
   const [diagnosed, setDiagnosed] = useState(false)
   const [diagError, setDiagError] = useState<string | null>(null)
+
+  // Extract store attributes from data (first row with matching store)
+  const storeInfo = useMemo(() => {
+    const row = data.find(r => r.店号 === storeId) ?? data[0]
+    if (!row) return { storeType: '', tradingArea: '', city: '', competitor: '' }
+    return {
+      storeType: row.门店标签 || '',
+      tradingArea: row.主要商圈 || '',
+      city: row.城市 || '',
+      competitor: row.零食店标签 || '', // competitor info from snack store tag
+    }
+  }, [data, storeId])
 
   const scenarioStats = useMemo(() => {
     return scenarios.map(s => {
@@ -71,7 +83,7 @@ export default function ShelfPage() {
     setDiagnosing(true)
     setDiagError(null)
     try {
-      const results = await diagnoseShelf(storeId, scenarioStats)
+      const results = await diagnoseShelf(storeId, scenarioStats, storeInfo)
       setScenarios(prev =>
         prev.map(s => ({
           ...s,
@@ -87,103 +99,154 @@ export default function ShelfPage() {
     }
   }
 
+  const totalGroups = useMemo(
+    () => scenarios.reduce((sum, s) => sum + s.currentGroups, 0),
+    [scenarios]
+  )
+
+  const confirmedTotal = useMemo(
+    () => scenarios.reduce((sum, s) => sum + s.confirmedGroups, 0),
+    [scenarios]
+  )
+
   const handleConfirmedChange = (name: string, val: number) => {
-    setScenarios(prev => prev.map(s => s.name === name ? { ...s, confirmedGroups: val } : s))
+    setScenarios(prev =>
+      prev.map(s => s.name === name ? { ...s, confirmedGroups: Math.max(0, val) } : s)
+    )
   }
 
   return (
     <div style={s.page}>
-      {/* Top title */}
-      <div style={s.topBar}>
-        <span style={s.titlePill}>货架分配建议</span>
-        <span style={s.titleSub}>AI将基于数据加霞姐经验</span>
+      {/* Fixed header area */}
+      <div style={s.fixedHeader}>
+        <div style={s.topBar}>
+          <span style={s.titlePill}>货架分配建议</span>
+          <span style={s.titleSub}>AI将基于数据加霞姐经验</span>
+        </div>
+
+        {/* Sticky table header */}
+        <div style={s.tableHeaderWrap}>
+          <table style={s.table}>
+            <thead>
+              <tr>
+                {['现有场景', '现有货架组数', 'AI推荐货架组数', 'AI推荐理由', '最终确认组数'].map(h => (
+                  <th key={h} style={s.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+          </table>
+        </div>
       </div>
 
-      {/* Table */}
-      <div style={s.tableWrap}>
-        <table style={s.table}>
-          <thead>
-            <tr>
-              {['现有场景', '现有货架组数', 'AI推荐货架组数', 'AI推荐理由', '最终确认组数'].map(h => (
-                <th key={h} style={s.th}>{h}</th>
+      {/* Scrollable table body */}
+      <div style={s.scrollArea}>
+        <div style={s.tableWrap}>
+          <table style={s.table}>
+            <tbody>
+              {scenarios.map(sc => (
+                <tr key={sc.name}>
+                  <td style={s.td}>{sc.name}</td>
+                  <td style={s.td}>{sc.currentGroups}</td>
+                  <td style={{ ...s.td, ...s.aiCell }}>
+                    {diagnosed && sc.aiDiagnosis ? sc.aiDiagnosis.suggestedGroups : ''}
+                  </td>
+                  <td style={{ ...s.td, ...s.aiCell, textAlign: 'left', fontSize: 12, padding: '8px 12px' }}>
+                    {diagnosed && sc.aiDiagnosis ? sc.aiDiagnosis.reason : ''}
+                  </td>
+                  <td style={s.td}>
+                    {diagnosed ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={sc.confirmedGroups}
+                        onChange={e => handleConfirmedChange(sc.name, parseInt(e.target.value) || 0)}
+                        style={s.numInput}
+                      />
+                    ) : ''}
+                  </td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {scenarios.map(sc => (
-              <tr key={sc.name}>
-                <td style={s.td}>{sc.name}</td>
-                <td style={s.td}>{sc.currentGroups}</td>
-                <td style={{ ...s.td, ...s.aiCell }}>
-                  {diagnosed && sc.aiDiagnosis ? sc.aiDiagnosis.suggestedGroups : ''}
-                </td>
-                <td style={{ ...s.td, ...s.aiCell, textAlign: 'left', fontSize: 12, padding: '8px 12px' }}>
-                  {diagnosed && sc.aiDiagnosis ? sc.aiDiagnosis.reason : ''}
-                </td>
-                <td style={s.td}>
-                  {diagnosed ? (
-                    <input
-                      type="number"
-                      min={0}
-                      max={20}
-                      value={sc.confirmedGroups}
-                      onChange={e => handleConfirmedChange(sc.name, parseInt(e.target.value) || 0)}
-                      style={s.numInput}
-                    />
-                  ) : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
 
-        {/* AI overlay card */}
-        {!diagnosed && (
-          <div style={s.overlay}>
-            {diagError && <div style={s.errMsg}>{diagError}</div>}
-            <button
-              style={{ ...s.diagBtn, ...(diagnosing ? s.diagBtnLoading : {}) }}
-              onClick={handleDiagnose}
-              disabled={diagnosing}
-            >
-              {diagnosing ? '分析中...（预计等待10秒）' : 'AI一键诊断'}
-            </button>
+          {/* AI overlay card */}
+          {!diagnosed && (
+            <div style={s.overlay}>
+              {diagError && <div style={s.errMsg}>{diagError}</div>}
+              <button
+                style={{ ...s.diagBtn, ...(diagnosing ? s.diagBtnLoading : {}) }}
+                onClick={handleDiagnose}
+                disabled={diagnosing}
+              >
+                {diagnosing ? '分析中...（预计等待10秒）' : 'AI一键诊断'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed footer: Apply button + StoreBar */}
+      <div style={s.fixedFooter}>
+        {diagnosed && (
+          <div style={s.totalHint}>
+            当前确认总组数：{confirmedTotal}组（原{totalGroups}组）
+            {confirmedTotal !== totalGroups && (
+              <span style={{ color: '#c0392b', marginLeft: 8 }}>
+                {confirmedTotal > totalGroups ? `多了${confirmedTotal - totalGroups}组，请调整后应用` : `少了${totalGroups - confirmedTotal}组，请调整后应用`}
+              </span>
+            )}
           </div>
         )}
+        <div style={s.applyRow}>
+          <button
+            disabled={diagnosed && confirmedTotal !== totalGroups}
+            style={{ ...s.applyBtn, ...(diagnosed && confirmedTotal !== totalGroups ? s.applyBtnDisabled : {}) }}
+            onClick={() => {
+            // Persist shelf adjustment deltas for ProductPage to consume
+            const shelfResult = scenarios.map(s => ({
+              name: s.name,
+              currentGroups: s.currentGroups,
+              confirmedGroups: s.confirmedGroups,
+              delta: s.confirmedGroups - s.currentGroups,
+            }))
+            sessionStorage.setItem('shelfResult', JSON.stringify(shelfResult))
+            navigate(`/products?store=${encodeURIComponent(storeId)}`)
+          }}>
+            应用
+          </button>
+        </div>
+        <StoreBar storeId={storeId} data={data} fixed={false} />
       </div>
-
-      {/* Apply button */}
-      <div style={s.applyRow}>
-        <button style={s.applyBtn} onClick={() => navigate(`/products?store=${encodeURIComponent(storeId)}`)}>
-          应用
-        </button>
-      </div>
-
-      <StoreBar storeId={storeId} data={data} />
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
   page: {
-    minHeight: '100vh',
+    height: '100vh',
     background: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    paddingBottom: 72,
     fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    overflow: 'hidden',
+  },
+  fixedHeader: {
+    flexShrink: 0,
+    background: '#fff',
+    borderBottom: '1px solid #e0e0e0',
   },
   topBar: {
     display: 'flex',
     alignItems: 'center',
     gap: 16,
-    padding: '24px 24px 16px',
+    padding: '16px 24px 12px',
   },
   titlePill: {
     border: '1.5px solid #333',
     borderRadius: 30,
-    padding: '6px 20px',
-    fontSize: 16,
+    padding: '5px 18px',
+    fontSize: 15,
     fontWeight: 600,
     color: '#222',
   },
@@ -191,23 +254,38 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: '#888',
   },
+  tableHeaderWrap: {
+    margin: '0 24px',
+    borderTop: '1px solid #d0d0d0',
+    borderLeft: '1px solid #d0d0d0',
+    borderRight: '1px solid #d0d0d0',
+    borderRadius: '4px 4px 0 0',
+    overflow: 'hidden',
+  },
+  scrollArea: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 24px',
+    WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
+  },
   tableWrap: {
     position: 'relative',
-    margin: '0 24px',
     border: '1px solid #d0d0d0',
-    borderRadius: 4,
+    borderTop: 'none',
+    borderRadius: '0 0 4px 4px',
     overflow: 'hidden',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: 14,
+    tableLayout: 'fixed',
   },
   th: {
     background: '#f0f0f0',
     borderRight: '1px solid #d0d0d0',
     borderBottom: '1px solid #d0d0d0',
-    padding: '12px 8px',
+    padding: '10px 8px',
     textAlign: 'center',
     fontWeight: 500,
     color: '#333',
@@ -216,10 +294,12 @@ const s: Record<string, React.CSSProperties> = {
   td: {
     borderRight: '1px solid #d0d0d0',
     borderBottom: '1px solid #e8e8e8',
-    padding: '12px 8px',
+    padding: '10px 8px',
     textAlign: 'center',
     color: '#333',
-    height: 52,
+    height: 48,
+    verticalAlign: 'middle',
+    wordBreak: 'break-all',
   },
   aiCell: {
     background: '#eef0f8',
@@ -236,7 +316,7 @@ const s: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'absolute',
     top: 0,
-    left: '40%',       // covers the 3 AI columns
+    left: '40%',
     right: 0,
     bottom: 0,
     background: '#eef0f8',
@@ -257,7 +337,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1.5px solid #9b9ecf',
     borderRadius: 30,
     padding: '10px 32px',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 600,
     color: '#555',
     cursor: 'pointer',
@@ -267,10 +347,20 @@ const s: Record<string, React.CSSProperties> = {
     opacity: 0.6,
     cursor: 'not-allowed',
   },
+  fixedFooter: {
+    flexShrink: 0,
+    background: '#fff',
+  },
+  totalHint: {
+    padding: '6px 24px 0',
+    fontSize: 12,
+    color: '#666',
+  },
   applyRow: {
     display: 'flex',
     justifyContent: 'flex-end',
-    padding: '16px 24px',
+    padding: '8px 24px 10px',
+    borderTop: '1px solid #e8e8e8',
   },
   applyBtn: {
     background: '#fff',
@@ -280,5 +370,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 15,
     color: '#555',
     cursor: 'pointer',
+  },
+  applyBtnDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
   },
 }
