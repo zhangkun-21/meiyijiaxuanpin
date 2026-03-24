@@ -58,34 +58,6 @@ export default function PerformancePage() {
           <p style={s.errorText}>{error}</p>
         ) : prediction && (
           <>
-            {/* Summary counts */}
-            <div style={s.countRow}>
-              <div style={s.countBox}>
-                <span style={s.countLabel}>下架商品</span>
-                <span style={s.countValue}>{prediction.delistCount}个</span>
-              </div>
-              <div style={s.countBox}>
-                <span style={s.countLabel}>上架商品</span>
-                <span style={s.countValue}>{prediction.listCount}个</span>
-              </div>
-            </div>
-
-            {/* Detail breakdown */}
-            <div style={s.detailSection}>
-              <div style={s.detailTitle}>下架商品数据</div>
-              <div style={s.detailRow}>
-                <span>90天销售额：{prediction.delistSales.toFixed(0)}元</span>
-                <span>平均毛利率：{prediction.delistMargin.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            <div style={s.detailSection}>
-              <div style={s.detailTitle}>上架商品数据</div>
-              <div style={s.detailRow}>
-                <span>90天销售额：{prediction.listSales.toFixed(0)}元</span>
-                <span>平均毛利率：{prediction.listMargin.toFixed(1)}%</span>
-              </div>
-            </div>
 
             {/* Predicted changes */}
             <div style={s.changeSection}>
