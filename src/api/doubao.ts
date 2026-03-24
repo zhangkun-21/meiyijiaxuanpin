@@ -130,41 +130,48 @@ ${scenarioText}
 
 格式：[{"scene": "品类名", "suggestedGroups": 数字, "reason": "理由"}, ...]`
 
-  const response = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({
-      // Use endpoint ID as model if MODEL not separately set
-      model: (!MODEL || MODEL === 'YOUR_MODEL_ID') ? ENDPOINT_RAW : MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      thinking: { type: "disabled" },
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`API请求失败: ${response.status}`)
-  }
-
-  const json = await response.json()
-  const content: string = json.choices?.[0]?.message?.content ?? '[]'
-
-  let parsed: Array<{ scene: string; suggestedGroups: number; reason: string }>
   try {
-    const match = content.match(/\[[\s\S]*\]/)
-    parsed = match ? (JSON.parse(match[0]) as typeof parsed) : []
-  } catch {
-    parsed = []
-  }
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        // Use endpoint ID as model if MODEL not separately set
+        model: (!MODEL || MODEL === 'YOUR_MODEL_ID') ? ENDPOINT_RAW : MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        thinking: { type: "disabled" },
+      }),
+    })
 
-  const result: Record<string, AIDiagnosisResult> = {}
-  for (const item of parsed) {
-    result[item.scene] = { suggestedGroups: item.suggestedGroups, reason: item.reason }
+    if (!response.ok) {
+      console.warn(`[v0] API请求失败: ${response.status}，使用模拟数据`)
+      // Fallback to mock on API error
+      return generateMockShelfResult(scenarios, storeInfo)
+    }
+
+    const json = await response.json()
+    const content: string = json.choices?.[0]?.message?.content ?? '[]'
+
+    let parsed: Array<{ scene: string; suggestedGroups: number; reason: string }>
+    try {
+      const match = content.match(/\[[\s\S]*\]/)
+      parsed = match ? (JSON.parse(match[0]) as typeof parsed) : []
+    } catch {
+      parsed = []
+    }
+
+    const result: Record<string, AIDiagnosisResult> = {}
+    for (const item of parsed) {
+      result[item.scene] = { suggestedGroups: item.suggestedGroups, reason: item.reason }
+    }
+    return result
+  } catch (err) {
+    console.warn('[v0] API调用异常，使用模拟数据', err)
+    return generateMockShelfResult(scenarios, storeInfo)
   }
-  return result
 }
 
 // ------- Performance Prediction -------
