@@ -188,16 +188,21 @@ export default function ShelfPage() {
 
       {/* Fixed footer: Apply button + StoreBar */}
       <div style={s.fixedFooter}>
-        <div style={s.totalHint}>
-          当前确认总组数：{confirmedTotal}组（原{totalGroups}组）
-          {confirmedTotal !== totalGroups && (
-            <span style={{ color: confirmedTotal > totalGroups ? '#c0392b' : '#e67e22', marginLeft: 8 }}>
-              {confirmedTotal > totalGroups ? `多了${confirmedTotal - totalGroups}组` : `少了${totalGroups - confirmedTotal}组`}
-            </span>
-          )}
-        </div>
+        {diagnosed && (
+          <div style={s.totalHint}>
+            当前确认总组数：{confirmedTotal}组（原{totalGroups}组）
+            {confirmedTotal !== totalGroups && (
+              <span style={{ color: '#c0392b', marginLeft: 8 }}>
+                {confirmedTotal > totalGroups ? `多了${confirmedTotal - totalGroups}组，请调整后应用` : `少了${totalGroups - confirmedTotal}组，请调整后应用`}
+              </span>
+            )}
+          </div>
+        )}
         <div style={s.applyRow}>
-          <button style={s.applyBtn} onClick={() => {
+          <button
+            disabled={diagnosed && confirmedTotal !== totalGroups}
+            style={{ ...s.applyBtn, ...(diagnosed && confirmedTotal !== totalGroups ? s.applyBtnDisabled : {}) }}
+            onClick={() => {
             // Persist shelf adjustment deltas for ProductPage to consume
             const shelfResult = scenarios.map(s => ({
               name: s.name,
