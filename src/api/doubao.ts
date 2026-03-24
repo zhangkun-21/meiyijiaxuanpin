@@ -95,28 +95,40 @@ export async function diagnoseShelf(
 
   const totalCurrentGroups = scenarios.reduce((sum, s) => sum + s.currentGroups, 0)
 
+  const scenarioNames = scenarios.map(s => s.name).join('、')
+
   const prompt = `你是一名便利店货架优化专家。门店${storeId}的属性如下：
 ${storeDesc || '普通社区店'}
 
 当前各品类货架情况（总计${totalCurrentGroups}组）：
 ${scenarioText}
 
+【重要约束】最终建议的各品类组数相加必须严格等于${totalCurrentGroups}组，不能多也不能少。
+
 请按以下步骤给出货架组数调整建议：
 
-第一步：基于品类营收和门店特性，逐品类判断应增加、减少还是维持货架组数。
-- 社区店经验：日化、粮油冲调、方便食品是刚需品，优先保障或增加
+第一步：基于品类营收和门店特性，逐品类初步判断应增加、减少还是维持。
+- 社区店经验：日化、粮油冲调、方便食品是刚需，优先保障
 - 商圈/办公店经验：大休闲、饮料、小零食、潮玩流量高，优先增加
-- 若周边有零食竞对，可适当压缩休闲零食，强化日化或粮油等差异化品类
+- 若有零食竞对，可压缩休闲零食，强化差异化品类
 - 销售额低于均值的品类应酌情压缩
 
-第二步：汇总初稿建议组数，计算总和。
-- 总组数必须与现有总组数（${totalCurrentGroups}组）保持一致
-- 如总和不符，按店型经验微调：社区店优先给日化/粮油补组，商圈店优先给大休闲/小零食补组；缩减时优先压缩营收最低的品类
+第二步：计算初稿总和，与${totalCurrentGroups}比较，算出差值。
+- 例如初稿总和=${totalCurrentGroups + 2}，则多了2组，需要从某些品类各减1组
+- 例如初稿总和=${totalCurrentGroups - 2}，则少了2组，需要给某些品类各加1组
+- 微调规则：社区店优先给日化/粮油加组或从休闲减组；商圈店优先给大休闲/小零食加组或从日化减组
+- 必须逐一调整直到总和恰好等于${totalCurrentGroups}组
 
-第三步：输出最终结果，每条理由需说明为何该店型/竞对情况下做此调整（50字以内）。
+第三步：验算最终各品类组数之和 = ${totalCurrentGroups}，确认无误后输出。
 
-返回JSON数组，格式如下，只返回JSON不要其他内容：
-[{"scene": "场景名", "suggestedGroups": 数字, "reason": "理由"}]`
+品类列表：${scenarioNames}
+
+返回JSON数组（只返回JSON不要其他内容），每条包含：
+- scene: 品类名（必须与上述品类列表完全一致）
+- suggestedGroups: 建议组数（整数，最小1）
+- reason: 调整理由（50字以内，说明店型/竞对下为何这样调整）
+
+格式：[{"scene": "品类名", "suggestedGroups": 数字, "reason": "理由"}, ...]`
 
   const response = await fetch(ENDPOINT, {
     method: 'POST',
