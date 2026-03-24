@@ -30,19 +30,49 @@ export async function diagnoseShelf(
   storeInfo: StoreInfo
 ): Promise<Record<string, AIDiagnosisResult>> {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY' || !MODEL || MODEL === 'YOUR_MODEL_ID') {
-    // Return mock data when API not configured - incorporate store info
+    // Mock: distribute groups based on revenue rank, keep total constant
+    const total = scenarios.reduce((sum, s) => sum + s.currentGroups, 0)
+    const isCommunity = storeInfo.storeType?.includes('社区') || !storeInfo.storeType
+    const hasCompetitor = !!storeInfo.competitor
+
+    // Priority boost rules
+    const boost = (name: string) => {
+      if (isCommunity && (name === '日化' || name === '粮油冲调' || name === '方便食品')) return 1.3
+      if (!isCommunity && (name === '大休闲' || name === '小零食' || name === '潮玩')) return 1.3
+      if (hasCompetitor && (name === '大休闲' || name === '小零食')) return 0.8
+      return 1.0
+    }
+
+    const weights = scenarios.map(s => ({
+      name: s.name,
+      weight: (s.avgSales90 ?? s.currentGroups) * boost(s.name),
+      current: s.currentGroups,
+    }))
+    const totalWeight = weights.reduce((sum, w) => sum + w.weight, 0)
+    // Proportional allocation, minimum 1 group each
+    const raw = weights.map(w => ({ name: w.name, groups: Math.max(1, Math.round((w.weight / totalWeight) * total)) }))
+    // Fix rounding drift
+    let drift = raw.reduce((sum, r) => sum + r.groups, 0) - total
+    const sorted = [...raw].sort((a, b) => b.groups - a.groups)
+    for (const item of sorted) {
+      if (drift === 0) break
+      const adj = drift > 0 ? -1 : 1
+      item.groups = Math.max(1, item.groups + adj)
+      drift -= drift > 0 ? 1 : -1
+    }
+    const finalMap = Object.fromEntries(raw.map(r => [r.name, r.groups]))
+
     const storeTypeHint = storeInfo.storeType || '社区店'
-    const competitorHint = storeInfo.competitor ? `，竞对主打零食` : ''
     return Object.fromEntries(
       scenarios.map(s => {
-        const adjust = Math.random() > 0.5 ? 1 : -1
-        const suggestion = s.currentGroups + adjust
-        const reason = `${storeTypeHint}应${s.name === '日化' || s.name === '粮油冲调' ? '强化' : '优化'}${s.name}品类${competitorHint}，建议调整为${Math.max(1, suggestion)}组提升坪效。`
+        const suggested = finalMap[s.name] ?? s.currentGroups
+        const diff = suggested - s.currentGroups
+        const direction = diff > 0 ? `增加${diff}组` : diff < 0 ? `减少${Math.abs(diff)}组` : '维持不变'
         return [
           s.name,
           {
-            suggestedGroups: Math.max(1, suggestion),
-            reason,
+            suggestedGroups: suggested,
+            reason: `${storeTypeHint}下${s.name}品类营收表现，建议${direction}，优化坪效。`,
           },
         ]
       })
@@ -63,21 +93,30 @@ export async function diagnoseShelf(
     storeInfo.competitor && `周边竞对：${storeInfo.competitor}`,
   ].filter(Boolean).join('，')
 
+  const totalCurrentGroups = scenarios.reduce((sum, s) => sum + s.currentGroups, 0)
+
   const prompt = `你是一名便利店货架优化专家。门店${storeId}的属性如下：
 ${storeDesc || '普通社区店'}
 
-当前货架情况：
+当前各品类货架情况（总计${totalCurrentGroups}组）：
 ${scenarioText}
 
-请根据门店属性（店型、商圈、竞对）和各品类销售数据，给出货架组数调整建议。要求：
-1. 根据店型特点判断应主打什么品类（如社区店主打日用、商圈店主打休闲零食等）
-2. 考虑周边竞对情况，差异化布局（如竞对主打零食则可强化其他品类）
-3. 建议组数合理（1-10组之间）
-4. 给出简短的调整理由（50字以内），需说明为什么该店型适合这样调整
-5. 以JSON数组格式返回：
-[{"scene": "场景名", "suggestedGroups": 数字, "reason": "理由"}]
+请按以下步骤给出货架组数调整建议：
 
-只返回JSON，不要其他内容。`
+第一步：基于品类营收和门店特性，逐品类判断应增加、减少还是维持货架组数。
+- 社区店经验：日化、粮油冲调、方便食品是刚需品，优先保障或增加
+- 商圈/办公店经验：大休闲、饮料、小零食、潮玩流量高，优先增加
+- 若周边有零食竞对，可适当压缩休闲零食，强化日化或粮油等差异化品类
+- 销售额低于均值的品类应酌情压缩
+
+第二步：汇总初稿建议组数，计算总和。
+- 总组数必须与现有总组数（${totalCurrentGroups}组）保持一致
+- 如总和不符，按店型经验微调：社区店优先给日化/粮油补组，商圈店优先给大休闲/小零食补组；缩减时优先压缩营收最低的品类
+
+第三步：输出最终结果，每条理由需说明为何该店型/竞对情况下做此调整（50字以内）。
+
+返回JSON数组，格式如下，只返回JSON不要其他内容：
+[{"scene": "场景名", "suggestedGroups": 数字, "reason": "理由"}]`
 
   const response = await fetch(ENDPOINT, {
     method: 'POST',

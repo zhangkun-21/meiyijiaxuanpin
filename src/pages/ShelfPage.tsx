@@ -110,45 +110,9 @@ export default function ShelfPage() {
   )
 
   const handleConfirmedChange = (name: string, val: number) => {
-    const newVal = Math.max(0, val)
-    setScenarios(prev => {
-      const current = prev.find(s => s.name === name)!.confirmedGroups
-      const diff = newVal - current // how much this scenario changed
-      if (diff === 0) return prev
-
-      // Find other scenarios to absorb the diff (take from largest, give to largest deficit)
-      const others = prev.filter(s => s.name !== name)
-      let remaining = diff
-      const updated = others.map(s => ({ ...s }))
-
-      if (diff > 0) {
-        // This scenario grew: reduce from others with most groups first
-        updated.sort((a, b) => b.confirmedGroups - a.confirmedGroups)
-        for (const o of updated) {
-          const canReduce = Math.max(0, o.confirmedGroups - 1)
-          const reduce = Math.min(remaining, canReduce)
-          o.confirmedGroups -= reduce
-          remaining -= reduce
-          if (remaining === 0) break
-        }
-      } else {
-        // This scenario shrank: add to others with fewest groups first
-        updated.sort((a, b) => a.confirmedGroups - b.confirmedGroups)
-        let toAdd = -diff
-        for (const o of updated) {
-          const add = Math.ceil(toAdd / (updated.length))
-          o.confirmedGroups += add
-          toAdd -= add
-          if (toAdd <= 0) break
-        }
-      }
-
-      return prev.map(s => {
-        if (s.name === name) return { ...s, confirmedGroups: newVal }
-        const found = updated.find(u => u.name === s.name)
-        return found ? { ...s, confirmedGroups: Math.max(0, found.confirmedGroups) } : s
-      })
-    })
+    setScenarios(prev =>
+      prev.map(s => s.name === name ? { ...s, confirmedGroups: Math.max(0, val) } : s)
+    )
   }
 
   return (
@@ -225,13 +189,15 @@ export default function ShelfPage() {
       {/* Fixed footer: Apply button + StoreBar */}
       <div style={s.fixedFooter}>
         <div style={s.totalHint}>
-          总货架组数：{confirmedTotal} / {totalGroups}组
-          {confirmedTotal !== totalGroups && <span style={{ color: '#c0392b', marginLeft: 8 }}>（总数已变，请调整）</span>}
+          当前确认总组数：{confirmedTotal}组（原{totalGroups}组）
+          {confirmedTotal !== totalGroups && (
+            <span style={{ color: confirmedTotal > totalGroups ? '#c0392b' : '#e67e22', marginLeft: 8 }}>
+              {confirmedTotal > totalGroups ? `多了${confirmedTotal - totalGroups}组` : `少了${totalGroups - confirmedTotal}组`}
+            </span>
+          )}
         </div>
         <div style={s.applyRow}>
-          <button style={{ ...s.applyBtn, ...(confirmedTotal !== totalGroups ? s.applyBtnDisabled : {}) }}
-            disabled={confirmedTotal !== totalGroups}
-            onClick={() => {
+          <button style={s.applyBtn} onClick={() => {
             // Persist shelf adjustment deltas for ProductPage to consume
             const shelfResult = scenarios.map(s => ({
               name: s.name,
@@ -241,8 +207,7 @@ export default function ShelfPage() {
             }))
             sessionStorage.setItem('shelfResult', JSON.stringify(shelfResult))
             navigate(`/products?store=${encodeURIComponent(storeId)}`)
-          }}
-          >
+          }}>
             应用
           </button>
         </div>
