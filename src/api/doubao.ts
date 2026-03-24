@@ -113,7 +113,7 @@ ${scenarioText}
 - 若有零食竞对，可压缩休闲零食，强化差异化品类
 - 销售额低于均值的品类应酌情压缩
 
-第二步：计算初稿总和，与${totalCurrentGroups}比较，算出差值。
+第���步：计算初稿总和，与${totalCurrentGroups}比较，算出差值。
 - 例如初稿总和=${totalCurrentGroups + 2}，则多了2组，需要从某些品类各减1组
 - 例如初稿总和=${totalCurrentGroups - 2}，则少了2组，需要给某些品类各加1组
 - 微调规则：社区店优先给日化/粮油加组或从休闲减组；商圈店优先给大休闲/小零食加组或从日化减组
@@ -241,6 +241,7 @@ export async function predictPerformance(
     inventoryReduction,
     summary,
   }
+}
 }
   }
 
